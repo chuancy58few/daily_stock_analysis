@@ -41,6 +41,8 @@
   - 支持 `MARKET_REVIEW_REGION` 环境变量：cn（A股）、us（美股）、both（两者）
   - us 模式适合仅关注美股的用户，使用 SPX/纳斯达克/道指/VIX 等指数；both 模式可同时复盘 A 股与美股
   - 默认 cn，保持向后兼容
+- 📊 分析结果摘要增加现价、PE、股息率字段（缺失时显示 N/A）
+- 🤖 AI 默认优先级调整为 OpenAI > Anthropic > Gemini
 - 📊 **仅分析结果摘要** (Issue #262)
   - 支持 `REPORT_SUMMARY_ONLY` 环境变量，设为 `true` 时只推送汇总，不含个股详情
   - 默认 `false`，多股时适合快速浏览
@@ -55,7 +57,7 @@
   - 需安装 `wkhtmltopdf` 和 `imgkit`
 - 🤖 **Anthropic Claude API 支持** (Issue #257)
   - 支持 `ANTHROPIC_API_KEY`、`ANTHROPIC_MODEL`、`ANTHROPIC_TEMPERATURE`、`ANTHROPIC_MAX_TOKENS` 环境变量
-  - AI 分析优先级：Gemini > Anthropic > OpenAI
+  - AI 分析优先级：OpenAI > Anthropic > Gemini
 - 📷 **从图片识别股票代码** (Issue #257)
   - 上传自选股截图，通过 Vision LLM 自动提取股票代码
   - 设置页「基础设置」中新增「从图片添加」区块
