@@ -536,6 +536,7 @@ class EfinanceFetcher(BaseFetcher):
             # efinance 也返回量比、市盈率、市值等字段
             vol_ratio_col = '量比' if '量比' in df.columns else 'volume_ratio'
             pe_col = '市盈率' if '市盈率' in df.columns else 'pe_ratio'
+            dy_col = '股息率' if '股息率' in df.columns else 'dividend_yield'
             total_mv_col = '总市值' if '总市值' in df.columns else 'total_mv'
             circ_mv_col = '流通市值' if '流通市值' in df.columns else 'circ_mv'
             
@@ -555,6 +556,7 @@ class EfinanceFetcher(BaseFetcher):
                 open_price=safe_float(row.get(open_col)),
                 volume_ratio=safe_float(row.get(vol_ratio_col)),  # 量比
                 pe_ratio=safe_float(row.get(pe_col)),  # 市盈率
+                dividend_yield=safe_float(row.get(dy_col)),
                 total_mv=safe_float(row.get(total_mv_col)),  # 总市值
                 circ_mv=safe_float(row.get(circ_mv_col)),  # 流通市值
             )

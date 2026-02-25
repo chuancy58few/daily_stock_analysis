@@ -18,6 +18,7 @@ from typing import Optional, Dict, Any, List
 from json_repair import repair_json
 
 from src.config import get_config
+from src.broker_ratings import get_broker_ratings_loader
 
 logger = logging.getLogger(__name__)
 
@@ -1510,6 +1511,14 @@ class GeminiAnalyzer:
                     ),
                 }
             )
+
+        config = get_config()
+        if getattr(config, "broker_ratings_enabled", False):
+            code = context.get("code") or ""
+            loader = get_broker_ratings_loader(
+                getattr(config, "broker_ratings_path", "broker_ratings.csv")
+            )
+            snapshot.update(loader.get_stances(code))
 
         return snapshot
 

@@ -15,10 +15,12 @@ import logging
 import random
 import time
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from datetime import datetime
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional, Tuple
 from itertools import cycle
+from email.utils import parsedate_to_datetime
+from urllib.parse import quote_plus
 import requests
 from newspaper import Article, Config
 
@@ -908,6 +910,9 @@ class SearchService:
         brave_keys: Optional[List[str]] = None,
         serpapi_keys: Optional[List[str]] = None,
         news_max_age_days: int = 3,
+        rss_enabled: bool = True,
+        rss_feed_template: str = "https://news.google.com/rss/search?q={q}&hl=zh-CN&gl=CN&ceid=CN:zh-Hans",
+        rss_max_results: int = 5,
     ):
         """
         初始化搜索服务
@@ -918,9 +923,15 @@ class SearchService:
             brave_keys: Brave Search API Key 列表
             serpapi_keys: SerpAPI Key 列表
             news_max_age_days: 新闻最大时效（天）
+            rss_enabled: 是否启用 RSS 免费新闻源
+            rss_feed_template: RSS 地址模板（包含 {q}）
+            rss_max_results: RSS 最大条数
         """
         self._providers: List[BaseSearchProvider] = []
         self.news_max_age_days = max(1, news_max_age_days)
+        self._rss_enabled = rss_enabled
+        self._rss_feed_template = rss_feed_template
+        self._rss_max_results = max(1, rss_max_results)
 
         # 初始化搜索引擎（按优先级排序）
         # 1. Bocha 优先（中文搜索优化，AI摘要）
@@ -943,8 +954,8 @@ class SearchService:
             self._providers.append(SerpAPISearchProvider(serpapi_keys))
             logger.info(f"已配置 SerpAPI 搜索，共 {len(serpapi_keys)} 个 API Key")
         
-        if not self._providers:
-            logger.warning("未配置任何搜索引擎 API Key，新闻搜索功能将不可用")
+        if not self._providers and not self._rss_enabled:
+            logger.warning("未配置任何搜索引擎 API Key，且 RSS 已关闭，新闻搜索功能将不可用")
 
         # In-memory search result cache: {cache_key: (timestamp, SearchResponse)}
         self._cache: Dict[str, Tuple[float, 'SearchResponse']] = {}
@@ -970,11 +981,150 @@ class SearchService:
     @property
     def is_available(self) -> bool:
         """检查是否有可用的搜索引擎"""
-        return any(p.is_available for p in self._providers)
+        return self._rss_enabled or any(p.is_available for p in self._providers)
 
     def _cache_key(self, query: str, max_results: int, days: int) -> str:
         """Build a cache key from query parameters."""
         return f"{query}|{max_results}|{days}"
+
+    def _build_rss_query(
+        self, stock_code: str, stock_name: str, focus_keywords: Optional[List[str]]
+    ) -> str:
+        if focus_keywords:
+            return " ".join(focus_keywords)
+        if self._is_foreign_stock(stock_code):
+            return f"{stock_name} {stock_code} stock latest news"
+        return f"{stock_name} {stock_code} 股票 最新消息"
+
+    def _parse_rss_date(self, date_str: str) -> Optional[datetime]:
+        if not date_str:
+            return None
+        try:
+            parsed = parsedate_to_datetime(date_str)
+            if parsed is not None:
+                return parsed.astimezone(tz=None).replace(tzinfo=None)
+        except Exception:
+            pass
+        try:
+            cleaned = date_str.replace("Z", "+00:00")
+            return datetime.fromisoformat(cleaned).replace(tzinfo=None)
+        except Exception:
+            return None
+
+    def _parse_rss_items(self, text: str) -> List[SearchResult]:
+        import xml.etree.ElementTree as ET
+
+        results: List[SearchResult] = []
+        root = ET.fromstring(text)
+
+        for item in root.findall(".//item"):
+            title = (item.findtext("title") or "").strip()
+            link = (item.findtext("link") or "").strip()
+            source = (item.findtext("source") or "").strip() or "Google News"
+            pub_date = (item.findtext("pubDate") or "").strip()
+            description = (item.findtext("description") or "").strip()
+            results.append(
+                SearchResult(
+                    title=title,
+                    snippet=description,
+                    url=link,
+                    source=source,
+                    published_date=pub_date or None,
+                )
+            )
+
+        if results:
+            return results
+
+        atom_ns = "{http://www.w3.org/2005/Atom}"
+        for entry in root.findall(f".//{atom_ns}entry"):
+            title = (entry.findtext(f"{atom_ns}title") or "").strip()
+            link_el = entry.find(f"{atom_ns}link")
+            link = (link_el.get("href") if link_el is not None else "") or ""
+            pub_date = (
+                (entry.findtext(f"{atom_ns}published") or "").strip()
+                or (entry.findtext(f"{atom_ns}updated") or "").strip()
+            )
+            summary = (entry.findtext(f"{atom_ns}summary") or "").strip()
+            results.append(
+                SearchResult(
+                    title=title,
+                    snippet=summary,
+                    url=link.strip(),
+                    source="Google News",
+                    published_date=pub_date or None,
+                )
+            )
+
+        return results
+
+    def _filter_rss_results(self, results: List[SearchResult]) -> List[SearchResult]:
+        seen: set[str] = set()
+        filtered: List[SearchResult] = []
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+
+        for result in results:
+            pub_dt = self._parse_rss_date(result.published_date or "")
+            if pub_dt is not None:
+                if now - pub_dt > timedelta(days=self.news_max_age_days):
+                    continue
+            key = result.url or f"{result.title}|{result.source}|{result.published_date}"
+            if key in seen:
+                continue
+            seen.add(key)
+            filtered.append(result)
+
+        return filtered
+
+    def _search_rss(self, query: str, max_results: int) -> SearchResponse:
+        if not self._rss_enabled:
+            return SearchResponse(
+                query=query,
+                results=[],
+                provider="RSS",
+                success=False,
+                error_message="RSS disabled",
+            )
+
+        feed_url = self._rss_feed_template.format(q=quote_plus(query))
+        headers = {
+            "User-Agent": "Mozilla/5.0 (compatible; daily_stock_analysis/1.0)",
+        }
+        start_time = time.time()
+
+        try:
+            resp = requests.get(feed_url, headers=headers, timeout=10)
+            elapsed = time.time() - start_time
+            if resp.status_code != 200:
+                return SearchResponse(
+                    query=query,
+                    results=[],
+                    provider="RSS",
+                    success=False,
+                    error_message=f"HTTP {resp.status_code}",
+                    search_time=elapsed,
+                )
+            parsed = self._parse_rss_items(resp.text)
+            filtered = self._filter_rss_results(parsed)
+            results = filtered[:max_results]
+            return SearchResponse(
+                query=query,
+                results=results,
+                provider="RSS",
+                success=bool(results),
+                error_message=None if results else "No RSS results",
+                search_time=elapsed,
+            )
+        except Exception as exc:
+            elapsed = time.time() - start_time
+            return SearchResponse(
+                query=query,
+                results=[],
+                provider="RSS",
+                success=False,
+                error_message=str(exc),
+                search_time=elapsed,
+            )
 
     def _get_cached(self, key: str) -> Optional['SearchResponse']:
         """Return cached SearchResponse if still valid, else None."""
@@ -1060,6 +1210,25 @@ class SearchService:
         if cached is not None:
             logger.info(f"使用缓存搜索结果: {stock_name}({stock_code})")
             return cached
+
+        # RSS 优先（免费方案）
+        if self._rss_enabled:
+            rss_query = self._build_rss_query(stock_code, stock_name, focus_keywords)
+            rss_cache_key = self._cache_key(
+                f"rss:{rss_query}", min(max_results, self._rss_max_results), self.news_max_age_days
+            )
+            rss_cached = self._get_cached(rss_cache_key)
+            if rss_cached is not None:
+                logger.info(f"使用缓存 RSS 结果: {stock_name}({stock_code})")
+                return rss_cached
+            rss_resp = self._search_rss(
+                rss_query, max_results=min(max_results, self._rss_max_results)
+            )
+            if rss_resp.success and rss_resp.results:
+                logger.info(f"使用 RSS 搜索成功")
+                self._put_cache(rss_cache_key, rss_resp)
+                return rss_resp
+            logger.warning(f"RSS 搜索失败: {rss_resp.error_message}，尝试其他引擎")
 
         # 依次尝试各个搜索引擎
         for provider in self._providers:
@@ -1227,6 +1396,20 @@ class SearchService:
         for dim in search_dimensions:
             if search_count >= max_searches:
                 break
+
+            if dim["name"] == "latest_news" and self._rss_enabled:
+                rss_query = self._build_rss_query(stock_code, stock_name, None)
+                rss_resp = self._search_rss(
+                    rss_query, max_results=min(self._rss_max_results, 5)
+                )
+                results[dim["name"]] = rss_resp
+                search_count += 1
+                if rss_resp.success:
+                    logger.info(f"[情报搜索] {dim['desc']}: RSS 获取 {len(rss_resp.results)} 条结果")
+                    continue
+                logger.warning(
+                    f"[情报搜索] {dim['desc']}: RSS 失败 - {rss_resp.error_message}"
+                )
             
             # 选择搜索引擎（轮流使用）
             available_providers = [p for p in self._providers if p.is_available]
@@ -1522,6 +1705,13 @@ def get_search_service() -> SearchService:
             brave_keys=config.brave_api_keys,
             serpapi_keys=config.serpapi_keys,
             news_max_age_days=config.news_max_age_days,
+            rss_enabled=getattr(config, "rss_enabled", True),
+            rss_feed_template=getattr(
+                config,
+                "rss_feed_template",
+                "https://news.google.com/rss/search?q={q}&hl=zh-CN&gl=CN&ceid=CN:zh-Hans",
+            ),
+            rss_max_results=getattr(config, "rss_max_results", 5),
         )
     
     return _search_service

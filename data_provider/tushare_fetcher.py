@@ -548,6 +548,7 @@ class TushareFetcher(BaseFetcher):
                     turnover_rate=safe_float(row.get('turnover_ratio')), # Pro 接口可能有换手率
                     pe_ratio=safe_float(row.get('pe')),
                     pb_ratio=safe_float(row.get('pb')),
+                    dividend_yield=safe_float(row.get('dv_ratio') or row.get('dividend_yield')),
                     total_mv=safe_float(row.get('total_mv')),
                 )
         except Exception as e:

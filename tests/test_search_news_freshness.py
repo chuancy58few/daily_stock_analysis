@@ -43,6 +43,7 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
         service = SearchService(
             bocha_keys=["dummy_key"],
             news_max_age_days=news_max_age_days,
+            rss_enabled=False,
         )
         mock_search = MagicMock(return_value=_fake_search_response())
         service._providers[0].search = mock_search

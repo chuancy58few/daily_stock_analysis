@@ -673,6 +673,9 @@ class NotificationService:
         price = snapshot.get("price", "N/A")
         pe_ratio = snapshot.get("pe_ratio", "N/A")
         dividend_yield = snapshot.get("dividend_yield", "N/A")
+        ms_stance = snapshot.get("ms_stance", "N/A")
+        ubs_stance = snapshot.get("ubs_stance", "N/A")
+        citi_stance = snapshot.get("citi_stance", "N/A")
 
         if emoji is None:
             emoji = r.get_emoji()
@@ -681,10 +684,18 @@ class NotificationService:
             r.name if r.name and not r.name.startswith("股票") else f"股票{r.code}"
         )
         stock_name = NotificationService._escape_md(raw_name)
+
+        def _limit_text(value: Any, max_len: int = 6) -> str:
+            if value is None:
+                return "N/A"
+            text = str(value)
+            return text if len(text) <= max_len else text[:max_len]
+
         return (
             f"{emoji} **{stock_name}({r.code})**: {r.operation_advice} | "
             f"评分 {r.sentiment_score} | {r.trend_prediction} | "
-            f"现价 {price} | PE {pe_ratio} | 股息率 {dividend_yield}"
+            f"现价 {price} | PE {pe_ratio} | 股息率 {dividend_yield} | "
+            f"MS:{_limit_text(ms_stance)} | UBS:{_limit_text(ubs_stance)} | Citi:{_limit_text(citi_stance)}"
         )
 
     @staticmethod

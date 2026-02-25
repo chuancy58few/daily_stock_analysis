@@ -86,6 +86,9 @@ class StockAnalysisPipeline:
             brave_keys=self.config.brave_api_keys,
             serpapi_keys=self.config.serpapi_keys,
             news_max_age_days=self.config.news_max_age_days,
+            rss_enabled=self.config.rss_enabled,
+            rss_feed_template=self.config.rss_feed_template,
+            rss_max_results=self.config.rss_max_results,
         )
 
         logger.info(f"调度器初始化完成，最大并发数: {self.max_workers}")
@@ -102,9 +105,9 @@ class StockAnalysisPipeline:
         else:
             logger.info("筹码分布分析已禁用")
         if self.search_service.is_available:
-            logger.info("搜索服务已启用 (Tavily/SerpAPI)")
+            logger.info("搜索服务已启用 (RSS/搜索API)")
         else:
-            logger.warning("搜索服务未启用（未配置 API Key）")
+            logger.warning("搜索服务未启用（未配置 API Key 且 RSS 已关闭）")
 
     def fetch_and_save_stock_data(
         self, code: str, force_refresh: bool = False
@@ -302,6 +305,7 @@ class StockAnalysisPipeline:
                 chip_data,
                 trend_result,
                 stock_name,  # 传入股票名称
+                code,
             )
 
             # Step 7: 调用 AI 分析（传入增强的上下文和新闻）
@@ -347,6 +351,7 @@ class StockAnalysisPipeline:
         chip_data: Optional[ChipDistribution],
         trend_result: Optional[TrendAnalysisResult],
         stock_name: str = "",
+        stock_code: str = "",
     ) -> Dict[str, Any]:
         """
         增强分析上下文
@@ -364,6 +369,10 @@ class StockAnalysisPipeline:
             增强后的上下文
         """
         enhanced = context.copy()
+
+        # 添加股票代码
+        if stock_code:
+            enhanced["code"] = stock_code
 
         # 添加股票名称
         if stock_name:

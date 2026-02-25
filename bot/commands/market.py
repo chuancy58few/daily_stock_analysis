@@ -83,13 +83,22 @@ class MarketCommand(BotCommand):
 
             # 初始化搜索服务
             search_service = None
-            if config.bocha_api_keys or config.tavily_api_keys or config.brave_api_keys or config.serpapi_keys:
+            if (
+                config.rss_enabled
+                or config.bocha_api_keys
+                or config.tavily_api_keys
+                or config.brave_api_keys
+                or config.serpapi_keys
+            ):
                 search_service = SearchService(
                     bocha_keys=config.bocha_api_keys,
                     tavily_keys=config.tavily_api_keys,
                     brave_keys=config.brave_api_keys,
                     serpapi_keys=config.serpapi_keys,
                     news_max_age_days=config.news_max_age_days,
+                    rss_enabled=config.rss_enabled,
+                    rss_feed_template=config.rss_feed_template,
+                    rss_max_results=config.rss_max_results,
                 )
 
             # 初始化 AI 分析器

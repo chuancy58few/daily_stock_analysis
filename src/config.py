@@ -93,6 +93,15 @@ class Config:
     news_max_age_days: int = 3   # 新闻最大时效（天）
     bias_threshold: float = 5.0  # 乖离率阈值（%），超过此值提示不追高
 
+    # === 新闻 RSS 配置（免费方案）===
+    rss_enabled: bool = True
+    rss_feed_template: str = "https://news.google.com/rss/search?q={q}&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"
+    rss_max_results: int = 5
+
+    # === 券商评级配置（手工维护）===
+    broker_ratings_enabled: bool = False
+    broker_ratings_path: str = "broker_ratings.csv"
+
     # === 通知配置（可同时配置多个，全部推送）===
     
     # 企业微信 Webhook
@@ -400,6 +409,14 @@ class Config:
             serpapi_keys=serpapi_keys,
             news_max_age_days=max(1, int(os.getenv('NEWS_MAX_AGE_DAYS', '3'))),
             bias_threshold=max(1.0, float(os.getenv('BIAS_THRESHOLD', '5.0'))),
+            rss_enabled=os.getenv('RSS_ENABLED', 'true').lower() == 'true',
+            rss_feed_template=os.getenv(
+                'RSS_FEED_TEMPLATE',
+                'https://news.google.com/rss/search?q={q}&hl=zh-CN&gl=CN&ceid=CN:zh-Hans',
+            ),
+            rss_max_results=max(1, int(os.getenv('RSS_MAX_RESULTS', '5'))),
+            broker_ratings_enabled=os.getenv('BROKER_RATINGS_ENABLED', 'false').lower() == 'true',
+            broker_ratings_path=os.getenv('BROKER_RATINGS_PATH', 'broker_ratings.csv'),
             wechat_webhook_url=os.getenv('WECHAT_WEBHOOK_URL'),
             feishu_webhook_url=os.getenv('FEISHU_WEBHOOK_URL'),
             telegram_bot_token=os.getenv('TELEGRAM_BOT_TOKEN'),
@@ -624,8 +641,14 @@ class Config:
         elif not self.gemini_api_key and not self.anthropic_api_key:
             warnings.append("提示：未配置 Gemini/Anthropic API Key，将使用 OpenAI 兼容 API")
         
-        if not self.bocha_api_keys and not self.tavily_api_keys and not self.brave_api_keys and not self.serpapi_keys:
-            warnings.append("提示：未配置搜索引擎 API Key (Bocha/Tavily/Brave/SerpAPI)，新闻搜索功能将不可用")
+        if (
+            not self.bocha_api_keys
+            and not self.tavily_api_keys
+            and not self.brave_api_keys
+            and not self.serpapi_keys
+            and not self.rss_enabled
+        ):
+            warnings.append("提示：未配置搜索引擎 API Key 且 RSS 已关闭，新闻搜索功能将不可用")
         
         # 检查通知配置
         has_notification = (

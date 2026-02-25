@@ -128,10 +128,15 @@
 | `SERPAPI_API_KEYS` | [SerpAPI](https://serpapi.com/baidu-search-api?utm_source=github_daily_stock_analysis) 全渠道搜索 | 可选 |
 | `BOCHA_API_KEYS` | [博查搜索](https://open.bocha.cn/) Web Search API（中文搜索优化，支持AI摘要，多个key用逗号分隔） | 可选 |
 | `BRAVE_API_KEYS` | [Brave Search](https://brave.com/search/api/) API（隐私优先，美股优化，多个key用逗号分隔） | 可选 |
+| `RSS_ENABLED` | 是否启用 RSS 免费新闻源（Google News RSS），默认 true | 可选 |
+| `RSS_FEED_TEMPLATE` | RSS 地址模板（包含 `{q}` 占位符） | 可选 |
+| `RSS_MAX_RESULTS` | RSS 最大条数（默认 5） | 可选 |
 | `TUSHARE_TOKEN` | [Tushare Pro](https://tushare.pro/weborder/#/login?reg=834638 ) Token | 可选 |
 | `WECHAT_MSG_TYPE` | 企微消息类型，默认 markdown，支持配置 text 类型，发送纯 markdown 文本 | 可选 |
 | `NEWS_MAX_AGE_DAYS` | 新闻最大时效（天），默认 3，避免使用过时信息 | 可选 |
 | `BIAS_THRESHOLD` | 乖离率阈值（%），默认 5.0，超过提示不追高；强势趋势股自动放宽 | 可选 |
+| `BROKER_RATINGS_ENABLED` | 是否启用券商评级展示（需维护 `broker_ratings.csv`），默认 false | 可选 |
+| `BROKER_RATINGS_PATH` | 券商评级 CSV 路径（默认 `broker_ratings.csv`） | 可选 |
 
 #### 3. 启用 Actions
 
@@ -171,9 +176,18 @@ python main.py
 共分析3只股票 | 🟢买入:0 🟡观望:2 🔴卖出:1
 
 📊 分析结果摘要
-⚪ 中钨高新(000657): 观望 | 评分 65 | 看多 | 现价 12.34 | PE 18.20 | 股息率 1.50%
-⚪ 永鼎股份(600105): 观望 | 评分 48 | 震荡 | 现价 7.89 | PE 12.40 | 股息率 0.80%
-🟡 新莱应材(300260): 卖出 | 评分 35 | 看空 | 现价 23.45 | PE 25.10 | 股息率 0.30%
+⚪ 中钨高新(000657): 观望 | 评分 65 | 看多 | 现价 12.34 | PE 18.20 | 股息率 1.50% | MS:看多 | UBS:中性 | Citi:看空
+⚪ 永鼎股份(600105): 观望 | 评分 48 | 震荡 | 现价 7.89 | PE 12.40 | 股息率 0.80% | MS:中性 | UBS:看多 | Citi:N/A
+🟡 新莱应材(300260): 卖出 | 评分 35 | 看空 | 现价 23.45 | PE 25.10 | 股息率 0.30% | MS:N/A | UBS:N/A | Citi:N/A
+
+**券商评级（手工维护）**  
+默认关闭，开启后会在摘要中追加 MS/UBS/Citi 的立场信息。维护 `broker_ratings.csv`：  
+`code,ms_stance,ms_as_of,ubs_stance,ubs_as_of,citi_stance,citi_as_of,updated_at,note`  
+`stance` 允许值：看多 / 中性 / 看空 / N/A。
+
+**股息率显示为 N/A 的原因**  
+默认实时行情优先级里，`tencent` 与 `akshare_sina` 通常不提供股息率字段，因此摘要会显示 N/A。  
+如需股息率，建议将 `REALTIME_SOURCE_PRIORITY` 调整为包含 `efinance` / `akshare_em` / `tushare` 等更全的数据源；或关闭实时行情使用历史数据。
 
 ⚪ 中钨高新 (000657)
 📰 重要信息速览

@@ -814,6 +814,9 @@ class AkshareFetcher(BaseFetcher):
                 high=safe_float(row.get('最高')),
                 low=safe_float(row.get('最低')),
                 pe_ratio=safe_float(row.get('市盈率-动态')),
+                dividend_yield=safe_float(
+                    row.get('股息率') or row.get('股息率(%)') or row.get('股息率%')
+                ),
                 pb_ratio=safe_float(row.get('市净率')),
                 total_mv=safe_float(row.get('总市值')),
                 circ_mv=safe_float(row.get('流通市值')),

@@ -14,6 +14,7 @@
   - 新增 `us_index_mapping` 模块，将用户输入（如 SPX）映射为 Yahoo Finance 符号（如 ^GSPC）
   - 美股指数与美股股票日线数据直接路由至 YfinanceFetcher，避免遍历不支持的数据源
   - 消除重复的美股识别逻辑，统一使用 `is_us_stock_code()` 函数
+- 补齐部分实时行情源的股息率字段映射，并在 README 说明可用来源与限制
 
 ### 优化
 - 🔒 **CI 门禁统一（P0）**
@@ -38,6 +39,8 @@
 
 ### 新增
 - **大盘复盘可选区域** (Issue #299)
+- **RSS 免费新闻源**：优先用于最新新闻维度，失败时回退到已配置的搜索 API
+- **券商评级展示**：支持手工维护 `broker_ratings.csv` 并在摘要中显示 MS/UBS/Citi 立场
   - 支持 `MARKET_REVIEW_REGION` 环境变量：cn（A股）、us（美股）、both（两者）
   - us 模式适合仅关注美股的用户，使用 SPX/纳斯达克/道指/VIX 等指数；both 模式可同时复盘 A 股与美股
   - 默认 cn，保持向后兼容

@@ -15,8 +15,14 @@ def test_summary_line_includes_pe_yield_price():
         "price": "1688.00",
         "pe_ratio": "18.5",
         "dividend_yield": "1.80%",
+        "ms_stance": "看多",
+        "ubs_stance": "中性",
+        "citi_stance": "看空",
     }
     line = service._build_summary_line(result)
     assert "PE" in line
     assert "股息率" in line
     assert "现价" in line
+    assert "MS:看多" in line
+    assert "UBS:中性" in line
+    assert "Citi:看空" in line
