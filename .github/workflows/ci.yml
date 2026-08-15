@@ -5,16 +5,16 @@ on:
     branches:
       - analysis/a-share-5y-drawdown-20260815
     paths:
-      - scripts/probe_tencent_universe.py
+      - scripts/probe_sina_universe_bse.py
       - .github/workflows/ci.yml
   workflow_dispatch:
 
 concurrency:
-  group: a-share-tencent-probe-${{ github.ref }}
+  group: a-share-sina-probe-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  tencent-probe:
+  sina-probe:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -33,20 +33,20 @@ jobs:
       - name: Install requests
         run: pip install 'requests>=2.31.0'
 
-      - name: Probe Tencent sources
+      - name: Probe Sina sources
         env:
           PYTHONUNBUFFERED: '1'
-        run: python scripts/probe_tencent_universe.py
+        run: python scripts/probe_sina_universe_bse.py
 
       - name: Show result
         if: always()
-        run: cat reports/tencent_probe/probe.json || true
+        run: cat reports/sina_probe/probe.json || true
 
       - name: Upload result
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: tencent-probe-${{ github.run_number }}
-          path: reports/tencent_probe/
+          name: sina-probe-${{ github.run_number }}
+          path: reports/sina_probe/
           if-no-files-found: warn
           retention-days: 7
