@@ -5,18 +5,18 @@ on:
     branches:
       - analysis/a-share-5y-drawdown-20260815
     paths:
-      - scripts/probe_sina_universe_bse.py
+      - scripts/probe_bse_history_mapping.py
       - .github/workflows/ci.yml
   workflow_dispatch:
 
 concurrency:
-  group: a-share-sina-probe-${{ github.ref }}
+  group: a-share-bse-history-probe-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  sina-probe:
+  bse-history-probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     permissions:
       contents: read
 
@@ -30,23 +30,23 @@ jobs:
           python-version: '3.11'
           cache: pip
 
-      - name: Install requests
-        run: pip install 'requests>=2.31.0'
+      - name: Install probe dependencies
+        run: pip install 'requests>=2.31.0' 'pandas>=2.0.0' 'lxml>=5.0.0'
 
-      - name: Probe Sina sources
+      - name: Probe BSE history
         env:
           PYTHONUNBUFFERED: '1'
-        run: python scripts/probe_sina_universe_bse.py
+        run: python scripts/probe_bse_history_mapping.py
 
       - name: Show result
         if: always()
-        run: cat reports/sina_probe/probe.json || true
+        run: cat reports/bse_history_probe/probe.json || true
 
       - name: Upload result
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: sina-probe-${{ github.run_number }}
-          path: reports/sina_probe/
+          name: bse-history-probe-${{ github.run_number }}
+          path: reports/bse_history_probe/
           if-no-files-found: warn
           retention-days: 7
