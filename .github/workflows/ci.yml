@@ -5,18 +5,18 @@ on:
     branches:
       - analysis/a-share-5y-drawdown-20260815
     paths:
-      - scripts/probe_a_share_data_sources.py
+      - scripts/probe_a_share_sources_short.py
       - .github/workflows/ci.yml
   workflow_dispatch:
 
 concurrency:
   group: a-share-source-probe-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
-  source-probe:
+  source-probe-short:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 8
     permissions:
       contents: read
 
@@ -30,25 +30,25 @@ jobs:
           python-version: '3.11'
           cache: pip
 
-      - name: Install probe dependencies
+      - name: Install minimal probe dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install 'requests>=2.31.0' 'pandas>=2.0.0' 'openpyxl>=3.1.0' 'baostock>=0.8.9' 'akshare>=1.17.0'
+          pip install 'requests>=2.31.0' 'pandas>=2.0.0' 'openpyxl>=3.1.0'
 
-      - name: Probe public sources
+      - name: Probe sources
         env:
           PYTHONUNBUFFERED: '1'
-        run: python scripts/probe_a_share_data_sources.py
+        run: python scripts/probe_a_share_sources_short.py
 
       - name: Show probe result
         if: always()
-        run: cat reports/a_share_source_probe/source_probe.json || true
+        run: cat reports/a_share_source_probe_short/probe.json || true
 
       - name: Upload probe result
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: a-share-source-probe-${{ github.run_number }}
-          path: reports/a_share_source_probe/
+          name: a-share-source-probe-short-${{ github.run_number }}
+          path: reports/a_share_source_probe_short/
           if-no-files-found: warn
           retention-days: 7
