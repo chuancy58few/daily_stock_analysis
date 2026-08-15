@@ -1,53 +1,83 @@
-name: Network Smoke
+name: A-share Five-Year Drawdown Screen
 
 on:
-  schedule:
-    - cron: '0 2 * * 1-5'
+  push:
+    branches:
+      - analysis/a-share-5y-drawdown-20260815
+    paths:
+      - scripts/scan_a_share_5y_drawdown_v2.py
+      - .github/workflows/network-smoke.yml
   workflow_dispatch:
 
 concurrency:
-  group: network-smoke-${{ github.ref }}
-  cancel-in-progress: true
+  group: a-share-five-year-drawdown-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  smoke:
+  screen:
     runs-on: ubuntu-latest
+    timeout-minutes: 360
     permissions:
       contents: read
+
     steps:
-      - name: 📥 Checkout
+      - name: Checkout analysis branch
         uses: actions/checkout@v4
 
-      - name: 🐍 Setup Python
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'
+          cache: pip
 
-      - name: 📦 Install dependencies
+      - name: Install minimal dependencies
         run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest
+          python -m pip install --upgrade pip
+          pip install 'tushare>=1.4.0' 'pandas>=2.0.0' 'numpy>=1.24.0'
 
-      - name: 🌐 Run pytest network smoke (non-blocking)
-        continue-on-error: true
+      - name: Restore scan checkpoint
+        uses: actions/cache@v4
+        with:
+          path: .cache/a_share_5y_drawdown
+          key: a-share-five-year-drawdown-20210816-20260814-v2
+
+      - name: Run full-market scan
+        env:
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+          TUSHARE_HTTP_URL: ${{ vars.TUSHARE_HTTP_URL || 'http://124.222.60.121:8020/' }}
+          PYTHONUNBUFFERED: '1'
         run: |
-          set -o pipefail
-          python -m pytest -m network -q | tee pytest-network.log
+          python scripts/scan_a_share_5y_drawdown_v2.py \
+            --start-date 20210816 \
+            --end-date 20260814 \
+            --threshold-ratio 5 \
+            --output-dir reports/a_share_5y_drawdown \
+            --checkpoint-dir .cache/a_share_5y_drawdown \
+            --request-pause 0.02
 
-      - name: 🚀 Run quick smoke (non-blocking)
-        continue-on-error: true
+      - name: Show result summary
+        if: success()
         run: |
-          set -o pipefail
-          ./test.sh quick --no-notify | tee quick-smoke.log
+          cat reports/a_share_5y_drawdown/筛选摘要.json
+          echo ''
+          echo 'Generated files:'
+          find reports/a_share_5y_drawdown -maxdepth 1 -type f -printf '%f %s bytes\n' | sort
 
-      - name: 📤 Upload smoke logs
+      - name: Upload screening results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: network-smoke-logs-${{ github.run_number }}
+          name: a-share-five-year-drawdown-${{ github.run_number }}
           path: |
-            pytest-network.log
-            quick-smoke.log
+            reports/a_share_5y_drawdown/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload checkpoint for recovery
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: a-share-five-year-drawdown-checkpoint-${{ github.run_number }}
+          path: .cache/a_share_5y_drawdown/
           if-no-files-found: ignore
+          retention-days: 7
