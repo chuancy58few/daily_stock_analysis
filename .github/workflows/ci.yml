@@ -5,18 +5,18 @@ on:
     branches:
       - analysis/a-share-5y-drawdown-20260815
     paths:
-      - scripts/probe_sina_adjustment.py
+      - scripts/probe_sina_qfq_factors.py
       - .github/workflows/ci.yml
   workflow_dispatch:
 
 concurrency:
-  group: a-share-sina-adjustment-probe-${{ github.ref }}
+  group: a-share-sina-qfq-factor-probe-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  adjustment-probe:
+  qfq-factor-probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 10
     permissions:
       contents: read
 
@@ -33,20 +33,20 @@ jobs:
       - name: Install requests
         run: pip install 'requests>=2.31.0'
 
-      - name: Compare price series
+      - name: Probe factor endpoint
         env:
           PYTHONUNBUFFERED: '1'
-        run: python scripts/probe_sina_adjustment.py
+        run: python scripts/probe_sina_qfq_factors.py
 
       - name: Show result
         if: always()
-        run: cat reports/sina_adjustment_probe/probe.json || true
+        run: cat reports/sina_qfq_factor_probe/probe.json || true
 
       - name: Upload result
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: sina-adjustment-probe-${{ github.run_number }}
-          path: reports/sina_adjustment_probe/
+          name: sina-qfq-factor-probe-${{ github.run_number }}
+          path: reports/sina_qfq_factor_probe/
           if-no-files-found: warn
           retention-days: 7
