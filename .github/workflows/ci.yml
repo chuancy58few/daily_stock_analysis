@@ -5,18 +5,18 @@ on:
     branches:
       - analysis/a-share-5y-drawdown-20260815
     paths:
-      - scripts/probe_sina_qfq_factors.py
+      - scripts/scan_a_share_5y_drawdown_sina_qfq.py
       - .github/workflows/ci.yml
   workflow_dispatch:
 
 concurrency:
-  group: a-share-sina-qfq-factor-probe-${{ github.ref }}
+  group: a-share-drawdown-sample-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  qfq-factor-probe:
+  sample-validation:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
     permissions:
       contents: read
 
@@ -30,23 +30,38 @@ jobs:
           python-version: '3.11'
           cache: pip
 
-      - name: Install requests
-        run: pip install 'requests>=2.31.0'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install 'requests>=2.31.0' 'pandas>=2.0.0' 'numpy>=1.24.0'
 
-      - name: Probe factor endpoint
+      - name: Run 50-stock validation sample
         env:
           PYTHONUNBUFFERED: '1'
-        run: python scripts/probe_sina_qfq_factors.py
+        run: |
+          python scripts/scan_a_share_5y_drawdown_sina_qfq.py \
+            --start-date 20210816 \
+            --end-date 20260814 \
+            --threshold-ratio 5 \
+            --max-workers 6 \
+            --max-requests-per-second 8 \
+            --retry-rounds 1 \
+            --limit 50 \
+            --output-dir reports/a_share_5y_drawdown_sample \
+            --checkpoint-dir .cache/a_share_5y_drawdown_sample
 
-      - name: Show result
+      - name: Show sample summary
         if: always()
-        run: cat reports/sina_qfq_factor_probe/probe.json || true
+        run: |
+          cat reports/a_share_5y_drawdown_sample/筛选摘要.json || true
+          echo ''
+          head -5 reports/a_share_5y_drawdown_sample/A股近5年全市场最大回撤.csv || true
 
-      - name: Upload result
+      - name: Upload validation sample
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: sina-qfq-factor-probe-${{ github.run_number }}
-          path: reports/sina_qfq_factor_probe/
+          name: a-share-drawdown-sample-${{ github.run_number }}
+          path: reports/a_share_5y_drawdown_sample/
           if-no-files-found: warn
           retention-days: 7
