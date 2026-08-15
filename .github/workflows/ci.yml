@@ -5,16 +5,16 @@ on:
     branches:
       - analysis/a-share-5y-drawdown-20260815
     paths:
-      - scripts/probe_bse_history_mapping.py
+      - scripts/probe_sina_adjustment.py
       - .github/workflows/ci.yml
   workflow_dispatch:
 
 concurrency:
-  group: a-share-bse-history-probe-${{ github.ref }}
+  group: a-share-sina-adjustment-probe-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  bse-history-probe:
+  adjustment-probe:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     permissions:
@@ -30,23 +30,23 @@ jobs:
           python-version: '3.11'
           cache: pip
 
-      - name: Install probe dependencies
-        run: pip install 'requests>=2.31.0' 'pandas>=2.0.0' 'lxml>=5.0.0'
+      - name: Install requests
+        run: pip install 'requests>=2.31.0'
 
-      - name: Probe BSE history
+      - name: Compare price series
         env:
           PYTHONUNBUFFERED: '1'
-        run: python scripts/probe_bse_history_mapping.py
+        run: python scripts/probe_sina_adjustment.py
 
       - name: Show result
         if: always()
-        run: cat reports/bse_history_probe/probe.json || true
+        run: cat reports/sina_adjustment_probe/probe.json || true
 
       - name: Upload result
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: bse-history-probe-${{ github.run_number }}
-          path: reports/bse_history_probe/
+          name: sina-adjustment-probe-${{ github.run_number }}
+          path: reports/sina_adjustment_probe/
           if-no-files-found: warn
           retention-days: 7
