@@ -10,13 +10,13 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: a-share-drawdown-sample-${{ github.ref }}
-  cancel-in-progress: true
+  group: a-share-five-year-drawdown-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  sample-validation:
+  full-market-screen:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 360
     permissions:
       contents: read
 
@@ -35,7 +35,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install 'requests>=2.31.0' 'pandas>=2.0.0' 'numpy>=1.24.0'
 
-      - name: Run 50-stock validation sample
+      - name: Restore resumable checkpoint
+        uses: actions/cache/restore@v4
+        with:
+          path: .cache/a_share_5y_drawdown_sina_qfq
+          key: a-share-5y-drawdown-sina-qfq-${{ github.run_id }}
+          restore-keys: |
+            a-share-5y-drawdown-sina-qfq-
+
+      - name: Run full current A-share screen
         env:
           PYTHONUNBUFFERED: '1'
         run: |
@@ -43,25 +51,32 @@ jobs:
             --start-date 20210816 \
             --end-date 20260814 \
             --threshold-ratio 5 \
-            --max-workers 6 \
-            --max-requests-per-second 8 \
-            --retry-rounds 1 \
-            --limit 50 \
-            --output-dir reports/a_share_5y_drawdown_sample \
-            --checkpoint-dir .cache/a_share_5y_drawdown_sample
+            --max-workers 10 \
+            --max-requests-per-second 10 \
+            --retry-rounds 2 \
+            --output-dir reports/a_share_5y_drawdown \
+            --checkpoint-dir .cache/a_share_5y_drawdown_sina_qfq
 
-      - name: Show sample summary
+      - name: Show screening summary
         if: always()
         run: |
-          cat reports/a_share_5y_drawdown_sample/筛选摘要.json || true
+          cat reports/a_share_5y_drawdown/筛选摘要.json || true
           echo ''
-          head -5 reports/a_share_5y_drawdown_sample/A股近5年全市场最大回撤.csv || true
+          echo 'Generated files:'
+          find reports/a_share_5y_drawdown -maxdepth 1 -type f -printf '%f %s bytes\n' | sort || true
 
-      - name: Upload validation sample
+      - name: Save resumable checkpoint
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .cache/a_share_5y_drawdown_sina_qfq
+          key: a-share-5y-drawdown-sina-qfq-${{ github.run_id }}
+
+      - name: Upload screening results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: a-share-drawdown-sample-${{ github.run_number }}
-          path: reports/a_share_5y_drawdown_sample/
+          name: a-share-five-year-drawdown-${{ github.run_number }}
+          path: reports/a_share_5y_drawdown/
           if-no-files-found: warn
-          retention-days: 7
+          retention-days: 30
