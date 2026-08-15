@@ -5,18 +5,18 @@ on:
     branches:
       - analysis/a-share-5y-drawdown-20260815
     paths:
-      - scripts/probe_a_share_sources_short.py
+      - scripts/probe_tencent_universe.py
       - .github/workflows/ci.yml
   workflow_dispatch:
 
 concurrency:
-  group: a-share-source-probe-${{ github.ref }}
+  group: a-share-tencent-probe-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  source-probe-short:
+  tencent-probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 10
     permissions:
       contents: read
 
@@ -30,25 +30,23 @@ jobs:
           python-version: '3.11'
           cache: pip
 
-      - name: Install minimal probe dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install 'requests>=2.31.0' 'pandas>=2.0.0' 'openpyxl>=3.1.0'
+      - name: Install requests
+        run: pip install 'requests>=2.31.0'
 
-      - name: Probe sources
+      - name: Probe Tencent sources
         env:
           PYTHONUNBUFFERED: '1'
-        run: python scripts/probe_a_share_sources_short.py
+        run: python scripts/probe_tencent_universe.py
 
-      - name: Show probe result
+      - name: Show result
         if: always()
-        run: cat reports/a_share_source_probe_short/probe.json || true
+        run: cat reports/tencent_probe/probe.json || true
 
-      - name: Upload probe result
+      - name: Upload result
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: a-share-source-probe-short-${{ github.run_number }}
-          path: reports/a_share_source_probe_short/
+          name: tencent-probe-${{ github.run_number }}
+          path: reports/tencent_probe/
           if-no-files-found: warn
           retention-days: 7
