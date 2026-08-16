@@ -6,17 +6,18 @@ on:
       - analysis/a-hkconnect-buy-now-20260816
     paths:
       - scripts/scan_buy_now_candidates.py
+      - scripts/run_buy_now_v2.py
       - .github/workflows/ci.yml
   workflow_dispatch:
 
 concurrency:
-  group: buy-now-sample-${{ github.ref }}
+  group: buy-now-full-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  sample-validation:
+  full-market-screen:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 90
     permissions:
       contents: read
 
@@ -33,37 +34,38 @@ jobs:
       - name: Install data dependencies
         run: pip install 'requests>=2.31.0' 'akshare>=1.17.0'
 
-      - name: Run sample multi-factor screen
+      - name: Run full multi-factor screen
         env:
           PYTHONUNBUFFERED: '1'
         run: |
-          python scripts/scan_buy_now_candidates.py \
-            --limit-a 160 \
-            --limit-hk 80 \
-            --workers 12 \
-            --requests-per-second 10 \
-            --hk-finance-workers 6 \
-            --hk-finance-requests-per-second 4 \
+          python scripts/run_buy_now_v2.py \
+            --workers 16 \
+            --requests-per-second 14 \
+            --hk-finance-workers 8 \
+            --hk-finance-requests-per-second 5 \
             --history-count 72 \
-            --output-dir reports/buy_now_sample \
-            --checkpoint-dir .cache/buy_now_sample
+            --output-dir reports/a_hkconnect_buy_now \
+            --checkpoint-dir .cache/a_hkconnect_buy_now
 
-      - name: Show sample output
+      - name: Show result
         if: always()
         run: |
-          cat reports/buy_now_sample/筛选摘要.json || true
+          cat reports/a_hkconnect_buy_now/筛选摘要.json || true
           echo ''
-          echo 'Top buyable:'
-          head -16 reports/buy_now_sample/适合分批建首仓.csv || true
+          echo 'Top buyable candidates:'
+          head -31 reports/a_hkconnect_buy_now/适合分批建首仓.csv || true
+          echo ''
+          echo 'Top pullback candidates:'
+          head -16 reports/a_hkconnect_buy_now/好公司等回调.csv || true
           echo ''
           echo 'Failures:'
-          cat reports/buy_now_sample/抓取失败清单.csv || true
+          wc -l reports/a_hkconnect_buy_now/抓取失败清单.csv || true
 
-      - name: Upload sample results
+      - name: Upload full results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: A股港股通买入筛选样本-${{ github.run_number }}
-          path: reports/buy_now_sample/
+          name: A股港股通全市场当前买入筛选-${{ github.run_number }}
+          path: reports/a_hkconnect_buy_now/
           if-no-files-found: warn
-          retention-days: 7
+          retention-days: 30
