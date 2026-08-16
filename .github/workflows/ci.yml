@@ -5,18 +5,18 @@ on:
     branches:
       - analysis/ah-double-spike-pattern-20260816
     paths:
-      - scripts/probe_ah_pattern_sources.py
+      - scripts/scan_ah_double_spike_pattern.py
       - .github/workflows/ci.yml
   workflow_dispatch:
 
 concurrency:
-  group: ah-pattern-source-probe-${{ github.ref }}
+  group: ah-pattern-sample-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  probe:
+  sample-validation:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 25
     permissions:
       contents: read
 
@@ -33,20 +33,33 @@ jobs:
       - name: Install requests
         run: pip install 'requests>=2.31.0'
 
-      - name: Probe sources
+      - name: Run sample validation
         env:
           PYTHONUNBUFFERED: '1'
-        run: python scripts/probe_ah_pattern_sources.py
+        run: |
+          python scripts/scan_ah_double_spike_pattern.py \
+            --limit-a 120 \
+            --limit-hk 120 \
+            --workers 10 \
+            --requests-per-second 10 \
+            --top-series-count 12 \
+            --output-dir reports/ah_double_spike_sample \
+            --checkpoint-dir .cache/ah_double_spike_sample
 
       - name: Show result
         if: always()
-        run: cat reports/ah_pattern_probe/probe.json || true
+        run: |
+          cat reports/ah_double_spike_sample/筛选摘要.json || true
+          echo ''
+          head -10 reports/ah_double_spike_sample/高相似严格候选.csv || true
+          echo ''
+          cat reports/ah_double_spike_sample/抓取失败清单.csv || true
 
       - name: Upload result
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ah-pattern-probe-${{ github.run_number }}
-          path: reports/ah_pattern_probe/
+          name: ah-pattern-sample-${{ github.run_number }}
+          path: reports/ah_double_spike_sample/
           if-no-files-found: warn
           retention-days: 7
