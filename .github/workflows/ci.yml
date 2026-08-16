@@ -3,21 +3,20 @@ name: CI
 on:
   push:
     branches:
-      - analysis/ah-double-spike-pattern-20260816
+      - analysis/a-hkconnect-l1-setup-20260816
     paths:
-      - scripts/scan_ah_double_spike_pattern.py
-      - scripts/run_ah_double_spike_pattern_v2.py
+      - scripts/scan_l1_setup_candidates.py
       - .github/workflows/ci.yml
   workflow_dispatch:
 
 concurrency:
-  group: ah-pattern-full-${{ github.ref }}
+  group: l1-stage-sample-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  full-market-screen:
+  sample-validation:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 25
     permissions:
       contents: read
 
@@ -34,50 +33,35 @@ jobs:
       - name: Install requests
         run: pip install 'requests>=2.31.0'
 
-      - name: Restore resumable checkpoint
-        uses: actions/cache/restore@v4
-        with:
-          path: .cache/ah_double_spike_full
-          key: ah-double-spike-full-${{ github.run_id }}
-          restore-keys: |
-            ah-double-spike-full-
-
-      - name: Run full A and HK screen
+      - name: Run sample L1-stage scan
         env:
           PYTHONUNBUFFERED: '1'
         run: |
-          python scripts/run_ah_double_spike_pattern_v2.py \
-            --workers 16 \
-            --requests-per-second 14 \
-            --history-count 260 \
-            --min-history-months 60 \
-            --top-series-count 40 \
-            --output-dir reports/ah_double_spike_pattern \
-            --checkpoint-dir .cache/ah_double_spike_full
+          python scripts/scan_l1_setup_candidates.py \
+            --limit-a 220 \
+            --limit-hk 220 \
+            --workers 12 \
+            --requests-per-second 11 \
+            --top-series-count 20 \
+            --output-dir reports/l1_sample \
+            --checkpoint-dir .cache/l1_sample
 
-      - name: Show result
+      - name: Show sample result
         if: always()
         run: |
-          cat reports/ah_double_spike_pattern/筛选摘要.json || true
+          cat reports/l1_sample/筛选摘要.json || true
           echo ''
-          echo 'Top strict candidates:'
-          head -16 reports/ah_double_spike_pattern/高相似严格候选.csv || true
+          echo 'Core candidates:'
+          head -12 reports/l1_sample/核心候选.csv || true
           echo ''
           echo 'Failures:'
-          wc -l reports/ah_double_spike_pattern/抓取失败清单.csv || true
+          cat reports/l1_sample/抓取失败清单.csv || true
 
-      - name: Save resumable checkpoint
-        if: always()
-        uses: actions/cache/save@v4
-        with:
-          path: .cache/ah_double_spike_full
-          key: ah-double-spike-full-${{ github.run_id }}
-
-      - name: Upload screening results
+      - name: Upload sample result
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: A股港股正大生物相似走势筛选-${{ github.run_number }}
-          path: reports/ah_double_spike_pattern/
+          name: L1阶段样本验证-${{ github.run_number }}
+          path: reports/l1_sample/
           if-no-files-found: warn
-          retention-days: 30
+          retention-days: 7
