@@ -6,17 +6,18 @@ on:
       - analysis/a-hkconnect-l1-setup-20260816
     paths:
       - scripts/scan_l1_setup_candidates.py
+      - scripts/run_l1_setup_v2.py
       - .github/workflows/ci.yml
   workflow_dispatch:
 
 concurrency:
-  group: l1-stage-sample-${{ github.ref }}
+  group: l1-stage-full-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  sample-validation:
+  full-l1-stage-screen:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 60
     permissions:
       contents: read
 
@@ -33,35 +34,53 @@ jobs:
       - name: Install requests
         run: pip install 'requests>=2.31.0'
 
-      - name: Run sample L1-stage scan
+      - name: Restore resumable checkpoint
+        uses: actions/cache/restore@v4
+        with:
+          path: .cache/a_hkconnect_l1_setup
+          key: a-hkconnect-l1-${{ github.run_id }}
+          restore-keys: |
+            a-hkconnect-l1-
+
+      - name: Run full L1-stage screen
         env:
           PYTHONUNBUFFERED: '1'
         run: |
-          python scripts/scan_l1_setup_candidates.py \
-            --limit-a 220 \
-            --limit-hk 220 \
-            --workers 12 \
-            --requests-per-second 11 \
-            --top-series-count 20 \
-            --output-dir reports/l1_sample \
-            --checkpoint-dir .cache/l1_sample
+          python scripts/run_l1_setup_v2.py \
+            --workers 16 \
+            --requests-per-second 14 \
+            --history-count 260 \
+            --min-history-months 60 \
+            --top-series-count 80 \
+            --output-dir reports/a_hkconnect_l1_setup \
+            --checkpoint-dir .cache/a_hkconnect_l1_setup
 
-      - name: Show sample result
+      - name: Show result
         if: always()
         run: |
-          cat reports/l1_sample/筛选摘要.json || true
+          cat reports/a_hkconnect_l1_setup/筛选摘要.json || true
           echo ''
-          echo 'Core candidates:'
-          head -12 reports/l1_sample/核心候选.csv || true
+          echo 'Top core candidates:'
+          head -26 reports/a_hkconnect_l1_setup/核心候选.csv || true
+          echo ''
+          echo 'Top just-started candidates:'
+          head -20 reports/a_hkconnect_l1_setup/刚启动候选.csv || true
           echo ''
           echo 'Failures:'
-          cat reports/l1_sample/抓取失败清单.csv || true
+          wc -l reports/a_hkconnect_l1_setup/抓取失败清单.csv || true
 
-      - name: Upload sample result
+      - name: Save resumable checkpoint
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .cache/a_hkconnect_l1_setup
+          key: a-hkconnect-l1-${{ github.run_id }}
+
+      - name: Upload screening results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: L1阶段样本验证-${{ github.run_number }}
-          path: reports/l1_sample/
+          name: A股港股通L1筑底刚启动筛选-${{ github.run_number }}
+          path: reports/a_hkconnect_l1_setup/
           if-no-files-found: warn
-          retention-days: 7
+          retention-days: 30
