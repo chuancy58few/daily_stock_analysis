@@ -6,17 +6,18 @@ on:
       - analysis/ah-double-spike-pattern-20260816
     paths:
       - scripts/scan_ah_double_spike_pattern.py
+      - scripts/run_ah_double_spike_pattern_v2.py
       - .github/workflows/ci.yml
   workflow_dispatch:
 
 concurrency:
-  group: ah-pattern-sample-${{ github.ref }}
+  group: ah-pattern-full-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  sample-validation:
+  full-market-screen:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 60
     permissions:
       contents: read
 
@@ -33,33 +34,50 @@ jobs:
       - name: Install requests
         run: pip install 'requests>=2.31.0'
 
-      - name: Run sample validation
+      - name: Restore resumable checkpoint
+        uses: actions/cache/restore@v4
+        with:
+          path: .cache/ah_double_spike_full
+          key: ah-double-spike-full-${{ github.run_id }}
+          restore-keys: |
+            ah-double-spike-full-
+
+      - name: Run full A and HK screen
         env:
           PYTHONUNBUFFERED: '1'
         run: |
-          python scripts/scan_ah_double_spike_pattern.py \
-            --limit-a 120 \
-            --limit-hk 120 \
-            --workers 10 \
-            --requests-per-second 10 \
-            --top-series-count 12 \
-            --output-dir reports/ah_double_spike_sample \
-            --checkpoint-dir .cache/ah_double_spike_sample
+          python scripts/run_ah_double_spike_pattern_v2.py \
+            --workers 16 \
+            --requests-per-second 14 \
+            --history-count 260 \
+            --min-history-months 60 \
+            --top-series-count 40 \
+            --output-dir reports/ah_double_spike_pattern \
+            --checkpoint-dir .cache/ah_double_spike_full
 
       - name: Show result
         if: always()
         run: |
-          cat reports/ah_double_spike_sample/筛选摘要.json || true
+          cat reports/ah_double_spike_pattern/筛选摘要.json || true
           echo ''
-          head -10 reports/ah_double_spike_sample/高相似严格候选.csv || true
+          echo 'Top strict candidates:'
+          head -16 reports/ah_double_spike_pattern/高相似严格候选.csv || true
           echo ''
-          cat reports/ah_double_spike_sample/抓取失败清单.csv || true
+          echo 'Failures:'
+          wc -l reports/ah_double_spike_pattern/抓取失败清单.csv || true
 
-      - name: Upload result
+      - name: Save resumable checkpoint
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .cache/ah_double_spike_full
+          key: ah-double-spike-full-${{ github.run_id }}
+
+      - name: Upload screening results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ah-pattern-sample-${{ github.run_number }}
-          path: reports/ah_double_spike_sample/
+          name: A股港股正大生物相似走势筛选-${{ github.run_number }}
+          path: reports/ah_double_spike_pattern/
           if-no-files-found: warn
-          retention-days: 7
+          retention-days: 30
