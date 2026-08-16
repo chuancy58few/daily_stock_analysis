@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-import scripts.scan_ah_double_spike_pattern as scanner
+import scan_ah_double_spike_pattern as scanner
 
 
 _original_analyze = scanner.analyze_record
